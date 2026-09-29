@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="lv">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blogs · API klients</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- ================= Navigācijas josla ================= -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="#posts" class="brand">
+                <span class="brand-logo" aria-hidden="true">B</span>
+                <span>Blogs <small>API klients</small></span>
+            </a>
+
+            <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-menu">
+                <span class="sr-only">Izvēlne</span>
+                <span class="burger" aria-hidden="true"></span>
+            </button>
+
+            <div class="nav-menu" id="nav-menu">
+                <ul class="nav-links">
+                    <li><a href="#posts" data-nav="posts">Ieraksti</a></li>
+                    <li><a href="#new" data-nav="new">Jauns ieraksts</a></li>
+                    <li><a href="#roles" data-nav="roles">Lomas</a></li>
+                    <li><a href="#log" data-nav="log">Pieprasījumi <span class="count" id="log-count">0</span></a></li>
+                </ul>
+                <div class="nav-user" id="nav-user"></div>
+            </div>
+        </div>
+        <div id="progress" class="progress" role="progressbar" aria-label="Notiek datu ielāde" hidden>
+            <div class="progress-bar"></div>
+        </div>
+    </nav>
+
+    <main class="container">
+
+        <!-- ================= Ieraksti ================= -->
+        <section class="view" data-view="posts">
+            <header class="page-head">
+                <div>
+                    <h1>Ieraksti</h1>
+                    <p class="lead">Visi bloga ieraksti. Atver komentārus, rediģē vai dzēs savus ierakstus.</p>
+                </div>
+                <a href="#new" class="button primary">+ Jauns ieraksts</a>
+            </header>
+
+            <div class="toolbar">
+                <form id="find-form" class="search">
+                    <input name="id" type="number" min="1" placeholder="Meklēt pēc ID…" aria-label="Ieraksta ID" required>
+                    <button type="submit">Atrast</button>
+                </form>
+                <button type="button" id="reload-btn" class="ghost">↻ Rādīt visus</button>
+                <span class="muted" id="posts-summary"></span>
+            </div>
+
+            <div class="ajax-options" role="group" aria-label="AJAX iestatījumi">
+                <span class="muted">AJAX metode:</span>
+                <div class="segmented">
+                    <label><input type="radio" name="ajax-method" value="fetch"><span>fetch (async/await)</span></label>
+                    <label><input type="radio" name="ajax-method" value="xhr"><span>XMLHttpRequest</span></label>
+                </div>
+                <label class="check">
+                    <input type="checkbox" id="slow-mode">
+                    <span>Simulēt lēnu savienojumu (+1,5 s), lai redzētu ielādes indikatorus</span>
+                </label>
+            </div>
+
+            <div id="posts" class="posts"></div>
+
+            <p class="endpoints">
+                <code>GET /api/posts</code> <code>GET /api/posts/{id}</code> <code>PUT /api/posts/{id}</code>
+                <code>DELETE /api/posts/{id}</code> <code>PATCH /api/posts/{id}/status</code>
+                <code>GET|POST|DELETE /api/posts/{id}/comments</code>
+            </p>
+        </section>
+
+        <!-- ================= Jauns ieraksts ================= -->
+        <section class="view narrow" data-view="new" hidden>
+            <header class="page-head">
+                <div>
+                    <h1>Jauns ieraksts</h1>
+                    <p class="lead">Ieraksts tiks publicēts tavā vārdā. Sākotnējais statuss ir <b>public</b>.</p>
+                </div>
+            </header>
+
+            <div class="card" data-requires-auth>
+                <form id="post-form" class="stack">
+                    <label>Virsraksts
+                        <input name="title" required maxlength="255" placeholder="Piemēram: Mana pirmā diena skolā">
+                    </label>
+                    <label>Teksts
+                        <textarea name="body" rows="7" required placeholder="Ko vēlies pastāstīt?"></textarea>
+                    </label>
+                    <div class="form-actions">
+                        <a href="#posts" class="button ghost">Atcelt</a>
+                        <button type="submit" class="primary">Publicēt</button>
+                    </div>
+                </form>
+            </div>
+
+            <p class="endpoints"><code>POST /api/posts</code> — nepieciešams tokens</p>
+        </section>
+
+        <!-- ================= Lomas ================= -->
+        <section class="view narrow" data-view="roles" hidden>
+            <header class="page-head">
+                <div>
+                    <h1>Lietotāju lomas</h1>
+                    <p class="lead">Piešķir vai noņem lietotājam lomu. Lietotāja ID redzams pie katra ieraksta („autors #…”).</p>
+                </div>
+            </header>
+
+            <div class="card" data-requires-auth>
+                <form id="role-form" class="stack">
+                    <div class="grid-2">
+                        <label>Lietotāja ID
+                            <input name="user_id" type="number" min="1" required placeholder="1">
+                        </label>
+                        <label>Loma
+                            <select name="role_id">
+                                <option value="1">guest</option>
+                                <option value="2">admin</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" value="remove" class="danger">Noņemt lomu</button>
+                        <button type="submit" value="assign" class="primary">Piešķirt lomu</button>
+                    </div>
+                </form>
+            </div>
+
+            <p class="endpoints"><code>POST /api/users/{id}/assign-role</code> <code>POST /api/users/{id}/remove-role</code></p>
+        </section>
+
+        <!-- ================= Konts ================= -->
+        <section class="view narrow" data-view="account" hidden>
+            <!-- Nepieslēgts lietotājs -->
+            <div id="auth-box">
+                <header class="page-head">
+                    <div>
+                        <h1>Pieslēgties</h1>
+                        <p class="lead">Pēc pieslēgšanās serveris izsniedz <b>tokenu</b>, ar kuru tiek sūtīti visi turpmākie pieprasījumi.</p>
+                    </div>
+                </header>
+
+                <div class="card">
+                    <div class="tabs" role="tablist">
+                        <button type="button" class="tab active" data-tab="login-form">Man ir konts</button>
+                        <button type="button" class="tab" data-tab="register-form">Izveidot kontu</button>
+                    </div>
+
+                    <form id="login-form" class="stack">
+                        <label>E-pasts <input name="email" type="email" required autocomplete="email" placeholder="vards@epasts.lv"></label>
+                        <label>Parole <input name="password" type="password" required autocomplete="current-password"></label>
+                        <button type="submit" class="primary block">Pieslēgties</button>
+                    </form>
+
+                    <form id="register-form" class="stack" hidden>
+                        <label>Vārds <input name="name" required maxlength="255" autocomplete="name"></label>
+                        <label>E-pasts <input name="email" type="email" required autocomplete="email" placeholder="vards@epasts.lv"></label>
+                        <div class="grid-2">
+                            <label>Parole <input name="password" type="password" required autocomplete="new-password"></label>
+                            <label>Parole atkārtoti <input name="password_confirmation" type="password" required autocomplete="new-password"></label>
+                        </div>
+                        <button type="submit" class="primary block">Izveidot kontu</button>
+                    </form>
+                </div>
+                <p class="endpoints"><code>POST /api/login</code> <code>POST /api/register</code></p>
+            </div>
+
+            <!-- Pieslēgts lietotājs -->
+            <div id="profile-box" hidden>
+                <header class="page-head">
+                    <div>
+                        <h1>Mans konts</h1>
+                        <p class="lead">Dati, ko serveris atgriež par lietotāju, kuram pieder tokens.</p>
+                    </div>
+                    <button type="button" id="logout-btn" class="danger">Iziet</button>
+                </header>
+                <div class="card">
+                    <div id="me-output"><p class="muted">Ielādē…</p></div>
+                </div>
+                <p class="endpoints"><code>GET /api/user</code> <code>POST /api/logout</code></p>
+            </div>
+        </section>
+
+        <!-- ================= Pieprasījumi ================= -->
+        <section class="view" data-view="log" hidden>
+            <header class="page-head">
+                <div>
+                    <h1>Pieprasījumi</h1>
+                    <p class="lead">Katrs AJAX pieprasījums, ko lapa nosūtījusi serverim. Uzklikšķini, lai redzētu JSON datus.</p>
+                </div>
+                <button type="button" id="clear-log" class="ghost">Notīrīt</button>
+            </header>
+
+            <div class="card">
+                <form id="settings-form" class="settings">
+                    <label for="api-url">API adrese</label>
+                    <input id="api-url" type="url" required>
+                    <button type="submit">Saglabāt</button>
+                </form>
+            </div>
+
+            <ol id="log" class="log"></ol>
+            <p class="empty-state" id="log-empty">Vēl nav neviena pieprasījuma.</p>
+        </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <template id="auth-required">
+        <div class="notice">
+            <p><b>Šai darbībai jāpieslēdzas.</b> Serveris pieņem šo pieprasījumu tikai ar derīgu tokenu.</p>
+            <a href="#account" class="button primary">Pieslēgties</a>
+        </div>
+    </template>
+
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
