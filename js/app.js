@@ -96,7 +96,9 @@
         if (user) Api.store.set('user', user);
         else Api.store.remove('user');
         renderAuthState();
-        renderAllPosts(); // pogas "Rediģēt"/"Dzēst" ir atkarīgas no lietotāja
+        // Saraksts atkarīgs no lietotāja: privātos ierakstus redz tikai to autors,
+        // un pogas "Rediģēt"/"Dzēst" parādās tikai pašu ierakstiem
+        loadPosts();
     }
 
     function renderAuthState() {

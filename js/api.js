@@ -74,6 +74,7 @@ const Api = (() => {
 
         const known = {
             'Unauthenticated.': 'Šai darbībai jāpieslēdzas savam kontam.',
+            'You do not have the required role.': 'Šo darbību var veikt tikai administrators.',
             'This action is unauthorized.': 'Tev nav tiesību veikt šo darbību. Tu vari mainīt tikai savus ierakstus.',
             'The provided creadentials are incorrect.': 'Nepareizs e-pasts vai parole.',
             'The provided credentials are incorrect.': 'Nepareizs e-pasts vai parole.',
