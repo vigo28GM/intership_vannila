@@ -252,7 +252,9 @@ function jokeErrorMessage(data, status) {
 
 // Joku meklēšana ar filtriem. Šeit NAV Authorization galvenes: mūsu Laravel token
 // nedrīkst nonākt pie trešās puses servisa. Atgriež joku masīvu.
-async function getJokes({ categories = [], blacklist = [], type = '', contains = '', lang = 'en', amount = 1 } = {}) {
+async function getJokes({
+    categories = [], blacklist = [], type = '', contains = '', lang = 'en', amount = 1, safeMode = false,
+} = {}) {
     const params = new URLSearchParams();
     if (blacklist.length) params.set('blacklistFlags', blacklist.join(','));
     if (type) params.set('type', type);
@@ -260,8 +262,12 @@ async function getJokes({ categories = [], blacklist = [], type = '', contains =
     if (lang !== 'en') params.set('lang', lang);
     params.set('amount', String(amount));
 
+    // JokeAPI atpazīst "safe-mode" tikai bez vērtības. URLSearchParams uzrakstītu "safe-mode=",
+    // un tad serviss filtru ignorē (pārbaudīts: atgriež arī nedrošus jokus), tāpēc to pievieno ar roku.
+    const query = [params.toString(), safeMode ? 'safe-mode' : ''].filter(Boolean).join('&');
+
     const category = categories.length ? categories.join(',') : 'Any';
-    const url = `${JOKE_API}/joke/${category}?${params}`;
+    const url = `${JOKE_API}/joke/${category}?${query}`;
 
     const { status, data, networkError } = await execute({
         method: 'GET',

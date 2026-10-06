@@ -87,13 +87,18 @@ Navigācijas joslā sadaļa **Jokes** parāda jokus no publiskā [JokeAPI](https
 | Filtrs lapā | JokeAPI parametrs | Piemērs |
 |---|---|---|
 | Kategorijas (ja nekas nav atzīmēts: visas) | ceļa daļa | `/joke/Programming,Pun` |
+| Slēdzis „Rādīt arī Dark jokus” | ceļa daļa | ieslēgts: `/joke/Programming,Dark`; izslēgts: visas kategorijas bez Dark |
 | Veids: viena rinda / ievads + atbilde | `type` | `type=twopart` |
 | Valoda | `lang` | `lang=de` |
 | Meklēt tekstā | `contains` | `contains=bug` |
 | Daudzums (1–10) | `amount` | `amount=5` |
-| Izslēgt jokus (NSFW, politiski…) | `blacklistFlags` | `blacklistFlags=nsfw,racist` |
+| Slēdzis „Tikai droši joki” | `safe-mode` | `…&safe-mode` |
+| Slēpt jokus (NSFW, politiski…) | `blacklistFlags` | `blacklistFlags=nsfw,racist` |
 
-- Pēc noklusējuma ir izslēgti visi jutīgie joki; atzīmi vai noņem „tabletes”, lai to mainītu.
+- Katrs filtrs ir slēdzis ar uzrakstu **Ieslēgts / Izslēgts**, un zem filtriem redzams kopsavilkums „Ieslēgtie filtri”.
+- **Dark joki** ir atsevišķs slēdzis (pēc noklusējuma ieslēgts). Ja ir atzīmētas kategorijas, Dark tiek pievienots tām klāt; izslēdzot slēdzi, Dark joki netiek rādīti.
+- **Tikai droši joki:** JokeAPI drošajā režīmā Dark jokus neatgriež, tāpēc šis slēdzis Dark slēdzi automātiski izslēdz un pelēko. `safe-mode` jāraksta **bez vērtības** (`safe-mode`, nevis `safe-mode=`), citādi serviss to ignorē, tāpēc kods šo daļu pievieno ar roku.
+- Pēc noklusējuma ir ieslēgta slēpšana visiem jutīgajiem jokiem; izslēdz attiecīgos slēdžus, lai tos redzētu.
 - Ievada un atbildes jokiem („twopart”) atbilde tiek parādīta pēc pogas „Rādīt atbildi”.
 - Ja neviens joks neatbilst filtriem, JokeAPI atbild ar kodu 400 (kļūda 106), un lapa parāda saprotamu paziņojumu.
 - Pieprasījumi uz JokeAPI iet caur to pašu kodu kā pārējie (`fetch` vai `XMLHttpRequest`, ielādes josla, žurnāls), un žurnālā redzams serveris un visi filtri.
