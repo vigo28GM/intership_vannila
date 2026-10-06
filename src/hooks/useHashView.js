@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export const VIEWS = ['posts', 'new', 'roles', 'account', 'log'];
+export const VIEWS = ['posts', 'new', 'roles', 'jokes', 'account', 'log'];
 
 function readView() {
     const name = window.location.hash.slice(1);

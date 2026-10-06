@@ -46,7 +46,7 @@ src/
 │   ├── useLoadingBar.js  josla augšā, kamēr notiek pieprasījumi
 │   └── useRequestLog.js  pieprasījumu žurnāls
 ├── components/         mazi atkārtoti lietojami elementi (NavBar, PostCard, Comments, Spinner…)
-└── views/              piecas lapas: PostsView, NewPostView, RolesView, AccountView, LogView
+└── views/              sešas lapas: PostsView, NewPostView, RolesView, JokesView, AccountView, LogView
 ```
 
 ## Kā tas atbilst iepriekšējai versijai bez React
@@ -79,6 +79,26 @@ Abas funkcijas saņem vienādus datus (metode, adrese, galvenes, ķermenis) un a
 - **Spinneris ierakstu sarakstā un komentāros** — kamēr dati tiek ielādēti.
 - **Spinneris pogā** — poga tiek bloķēta un rāda griežošos aplīti, kamēr tās pieprasījums tiek izpildīts.
 - **„Simulēt lēnu savienojumu”** — pievieno 1,5 s aizkavi, lai indikatorus var mierīgi parādīt (lokāli atbildes nāk pārāk ātri).
+
+## Jokes: ārējs API ar filtriem
+
+Navigācijas joslā sadaļa **Jokes** parāda jokus no publiskā [JokeAPI](https://v2.jokeapi.dev) (`GET https://v2.jokeapi.dev/joke/{kategorijas}`). Tas ir cits serviss nekā mūsu Laravel API, tāpēc darbojas bez pieslēgšanās. Filtrus apstrādā pats JokeAPI, mēs tikai sakārtojam pieprasījuma parametrus:
+
+| Filtrs lapā | JokeAPI parametrs | Piemērs |
+|---|---|---|
+| Kategorijas (ja nekas nav atzīmēts: visas) | ceļa daļa | `/joke/Programming,Pun` |
+| Veids: viena rinda / ievads + atbilde | `type` | `type=twopart` |
+| Valoda | `lang` | `lang=de` |
+| Meklēt tekstā | `contains` | `contains=bug` |
+| Daudzums (1–10) | `amount` | `amount=5` |
+| Izslēgt jokus (NSFW, politiski…) | `blacklistFlags` | `blacklistFlags=nsfw,racist` |
+
+- Pēc noklusējuma ir izslēgti visi jutīgie joki; atzīmi vai noņem „tabletes”, lai to mainītu.
+- Ievada un atbildes jokiem („twopart”) atbilde tiek parādīta pēc pogas „Rādīt atbildi”.
+- Ja neviens joks neatbilst filtriem, JokeAPI atbild ar kodu 400 (kļūda 106), un lapa parāda saprotamu paziņojumu.
+- Pieprasījumi uz JokeAPI iet caur to pašu kodu kā pārējie (`fetch` vai `XMLHttpRequest`, ielādes josla, žurnāls), un žurnālā redzams serveris un visi filtri.
+- **Drošība:** Laravel `Authorization` tokens uz JokeAPI **netiek sūtīts** (`getJokes()` izmanto savas galvenes). Jokus React attēlo kā tekstu, tāpēc ārēja satura HTML netiek izpildīts.
+- JokeAPI atļauj 120 pieprasījumus minūtē.
 
 ## Galapunkti
 

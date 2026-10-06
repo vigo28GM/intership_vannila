@@ -9,6 +9,7 @@ import { usePosts } from './hooks/usePosts.js';
 import { useRequestLog } from './hooks/useRequestLog.js';
 import { useToast } from './hooks/useToast.js';
 import AccountView from './views/AccountView.jsx';
+import JokesView from './views/JokesView.jsx';
 import LogView from './views/LogView.jsx';
 import NewPostView from './views/NewPostView.jsx';
 import PostsView from './views/PostsView.jsx';
@@ -108,6 +109,7 @@ export default function App() {
                     <PostsView active={view === 'posts'} />
                     <NewPostView active={view === 'new'} />
                     <RolesView active={view === 'roles'} />
+                    <JokesView active={view === 'jokes'} />
                     <AccountView active={view === 'account'} />
                     <LogView active={view === 'log'} entries={log.entries} onClear={log.clear} />
                 </main>

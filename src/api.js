@@ -177,14 +177,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ---------- Kopīgā pieprasījuma funkcija ----------
 
-async function request(method, path, body) {
-    const url = getBaseUrl() + path;
-    // Accept: application/json liek Laravel atgriezt kļūdas JSON formātā, nevis HTML
-    const headers = { Accept: 'application/json' };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-
+// Kopīgais kodols jebkuram pieprasījumam (arī uz citām vietnēm): nosūta ar izvēlēto metodi
+// (fetch / XHR), skaita gaidošos pieprasījumus un raksta žurnālu. Tokenu šeit nepievieno —
+// galvenes sagatavo tas, kas funkciju izsauc.
+async function execute({ method, url, headers, body }) {
     const transport = TRANSPORTS[getMethod()];
     let status = 0;
     let data = null;
@@ -217,12 +213,67 @@ async function request(method, path, body) {
         });
     }
 
+    return { status, data, networkError };
+}
+
+// Pieprasījums uz mūsu Laravel API (ar tokenu un latviešu kļūdu tekstiem)
+async function request(method, path, body) {
+    const url = getBaseUrl() + path;
+    // Accept: application/json liek Laravel atgriezt kļūdas JSON formātā, nevis HTML
+    const headers = { Accept: 'application/json' };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const { status, data, networkError } = await execute({ method, url, headers, body });
+
     if (networkError) throw new ApiError(statusMessage(0), 0, null);
 
     // /login atgriež kļūdu ar statusu 200, tāpēc pārbaudām arī "errors" lauku
     const failed = status < 200 || status >= 300 || (data && typeof data === 'object' && data.errors);
     if (failed) throw new ApiError(errorMessage(data, status), status, data);
     return data;
+}
+
+// ---------- JokeAPI (ārējs serviss: https://v2.jokeapi.dev) ----------
+
+const JOKE_API = 'https://v2.jokeapi.dev';
+
+function jokeErrorMessage(data, status) {
+    if (data && typeof data === 'object' && data.error) {
+        if (data.code === 106) return 'Pēc šiem filtriem joki netika atrasti. Mēģini mazāk ierobežot filtrus.';
+        const reason = Array.isArray(data.causedBy) ? data.causedBy.join(' ') : data.message;
+        if (reason) return `JokeAPI kļūda: ${reason}`;
+    }
+    if (status === 429) return 'JokeAPI atļauj 120 pieprasījumus minūtē. Uzgaidi mirkli.';
+    if (status >= 500) return 'JokeAPI serveris šobrīd nedarbojas. Mēģini vēlāk.';
+    return `JokeAPI atbildēja ar kļūdu (kods ${status}).`;
+}
+
+// Joku meklēšana ar filtriem. Šeit NAV Authorization galvenes: mūsu Laravel token
+// nedrīkst nonākt pie trešās puses servisa. Atgriež joku masīvu.
+async function getJokes({ categories = [], blacklist = [], type = '', contains = '', lang = 'en', amount = 1 } = {}) {
+    const params = new URLSearchParams();
+    if (blacklist.length) params.set('blacklistFlags', blacklist.join(','));
+    if (type) params.set('type', type);
+    if (contains.trim()) params.set('contains', contains.trim());
+    if (lang !== 'en') params.set('lang', lang);
+    params.set('amount', String(amount));
+
+    const category = categories.length ? categories.join(',') : 'Any';
+    const url = `${JOKE_API}/joke/${category}?${params}`;
+
+    const { status, data, networkError } = await execute({
+        method: 'GET',
+        url,
+        headers: { Accept: 'application/json' },
+    });
+
+    if (networkError) throw new ApiError('Neizdevās sazināties ar JokeAPI. Pārbaudi interneta savienojumu.', 0, null);
+    if (status < 200 || status >= 300 || data?.error) throw new ApiError(jokeErrorMessage(data, status), status, data);
+
+    // Viens joks nāk kā objekts, vairāki — kā { jokes: [...] }
+    return Array.isArray(data?.jokes) ? data.jokes : [data];
 }
 
 export const Api = {
@@ -257,6 +308,9 @@ export const Api = {
     getComments: (postId) => request('GET', `/posts/${postId}/comments`),
     createComment: (postId, content) => request('POST', `/posts/${postId}/comments`, { content }),
     deleteComment: (postId, commentId) => request('DELETE', `/posts/${postId}/comments/${commentId}`),
+
+    // Joki (ārējais JokeAPI)
+    getJokes,
 
     // Lomas
     assignRole: (userId, roleId) => request('POST', `/users/${userId}/assign-role`, { role_id: roleId }),

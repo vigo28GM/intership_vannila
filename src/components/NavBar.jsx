@@ -5,6 +5,7 @@ const LINKS = [
     { view: 'posts', label: 'Ieraksti' },
     { view: 'new', label: 'Jauns ieraksts' },
     { view: 'roles', label: 'Lomas' },
+    { view: 'jokes', label: 'Jokes' },
 ];
 
 export default function NavBar({ view, user, unseen, loading, menuOpen, onToggleMenu }) {

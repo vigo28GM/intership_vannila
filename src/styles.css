@@ -789,6 +789,83 @@ button.primary.loading::after { border-color: rgb(255 255 255 / 0.4); border-top
     .spinner, button.loading::after { animation-duration: 2s; }
 }
 
+/* ================= Joki ================= */
+
+.filter-group { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+.filter-group legend {
+    padding: 0;
+    margin-bottom: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Atzīmējamas "tabletes" (kategorijas un izslēdzamās pazīmes) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip { position: relative; display: block; cursor: pointer; }
+
+.chip input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.chip span {
+    display: block;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.chip:hover span { border-color: var(--primary); }
+
+.chip input:checked + span {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.chip input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.jokes { display: flex; flex-direction: column; gap: 16px; }
+
+.joke {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: fade-in 0.25s ease-out;
+}
+
+.joke-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.joke-text, .joke-punchline {
+    font-size: 1.1rem;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.joke-punchline { font-weight: 600; color: var(--primary); }
+
+.badge-category { background: var(--primary-soft); color: var(--primary); }
+.badge-flag { background: var(--danger-soft); color: var(--danger); }
+
 /* ================= Paziņojums ================= */
 
 .toast {
