@@ -1,21 +1,18 @@
-import { Api } from '../api.js';
 import { hidePasswords } from '../format.js';
 
-// Viens AJAX pieprasījums žurnālā: metode, adrese, statuss, laiks un nosūtītie/saņemtie dati
+// Viens AJAX pieprasījums žurnālā: metode, adrese, statuss, laiks un nosūtītie/saņemtie dati.
+// Komponente ir tīra: viss, kas jāparāda (arī serveris un ceļš), jau ir ierakstā.
 export default function LogEntry({ entry }) {
-    const { method, url, status, body, data, ms, via, time } = entry;
+    const { method, host, path, external, status, body, data, ms, via, time } = entry;
     const ok = status >= 200 && status < 300;
-
-    // Pieprasījumiem uz citu serveri (piemēram, JokeAPI) parāda arī adresi un filtrus
-    const target = new URL(url);
-    const external = target.host !== new URL(Api.getBaseUrl()).host;
 
     return (
         <li className={ok ? 'ok' : 'fail'}>
             <details>
                 <summary>
                     <span className={`method method-${method.toLowerCase()}`}>{method}</span>
-                    <span className="url">{external ? target.host : ''}{target.pathname}{target.search}</span>
+                    {/* Pieprasījumiem uz citu serveri (piemēram, JokeAPI) parāda arī serveri un filtrus */}
+                    <span className="url">{external ? host : ''}{path}</span>
                     <span className={`via via-${via.toLowerCase()}`} title="Ar kuru metodi nosūtīts">{via}</span>
                     <span className="status">{status || 'nav savienojuma'}</span>
                     <span className="muted">{`${ms} ms`}</span>

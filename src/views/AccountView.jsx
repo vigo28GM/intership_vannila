@@ -28,34 +28,40 @@ function Profile({ me }) {
     );
 }
 
-export default function AccountView({ active }) {
-    const { user, setSession, notify, go, run } = useApp();
-    const [tab, setTab] = useState('login');
+// Pieprasa no servera datus par lietotāju, kuram pieder tokens. Komponente parādās tikai tad, kad
+// konta sadaļa ir atvērta, tāpēc ielāde sākas atverot un tiek atcelta, kad lapa tiek pamesta.
+function ProfileCard() {
+    const { run } = useApp();
     const [me, setMe] = useState(null);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        run(() => Api.me({ signal: controller.signal })).then((result) => {
+            if (result && result !== true) setMe(result);
+        });
+        return () => controller.abort();
+    }, [run]);
+
+    return me ? <Profile me={me} /> : <p className="muted">Ielādē…</p>;
+}
+
+export default function AccountView({ active }) {
+    const { user, setSession, notify, go } = useApp();
+    const [tab, setTab] = useState('login');
     const [busy, perform] = useRunner();
 
-    // Atverot kontu, no servera pieprasa datus par lietotāju, kuram pieder tokens.
-    // Tikai tad, kad sadaļa tiek atvērta (nevis pēc pieslēgšanās, kad lapa jau pārslēdzas citur).
-    useEffect(() => {
-        if (!active || !user) return undefined;
-        let cancelled = false;
-        setMe(null);
-        run(() => Api.me()).then((result) => {
-            if (!cancelled && result && result !== true) setMe(result);
-        });
-        return () => { cancelled = true; };
-    }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
-
+    // Vispirms pāriet uz ierakstu sadaļu un tikai tad iestata lietotāju, lai profila karte,
+    // kas pieder šai sadaļai, nemēģina ielādēties, kad sadaļa jau tiek pamesta.
     const login = async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
         const fields = Object.fromEntries(new FormData(form));
         const data = await perform('login', () => Api.login(fields));
         if (!data) return;
+        go('posts');
         setSession(data.user, data.token);
         form.reset();
         notify(`Sveiks, ${data.user.name}!`);
-        go('posts');
     };
 
     const register = async (event) => {
@@ -64,17 +70,17 @@ export default function AccountView({ active }) {
         const fields = Object.fromEntries(new FormData(form));
         const data = await perform('register', () => Api.register(fields));
         if (!data) return;
+        go('posts');
         setSession(data.user, data.token);
         form.reset();
         notify(`Konts izveidots. Sveiks, ${data.user.name}!`);
-        go('posts');
     };
 
     const logout = async () => {
         // Lokāli izrakstāmies arī tad, ja serveris tokenu vairs neatpazīst
         await perform('logout', () => Api.logout(), 'Tu esi izrakstījies.');
-        setSession(null, null);
         go('posts');
+        setSession(null, null);
     };
 
     return (
@@ -147,7 +153,7 @@ export default function AccountView({ active }) {
                     </header>
                     <div className="card">
                         <div id="me-output">
-                            {me ? <Profile me={me} /> : <p className="muted">Ielādē…</p>}
+                            {active && <ProfileCard />}
                         </div>
                     </div>
                     <p className="endpoints"><code>GET /api/user</code> <code>POST /api/logout</code></p>

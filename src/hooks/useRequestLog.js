@@ -4,27 +4,23 @@ import { Api } from '../api.js';
 const MAX_LOG_ITEMS = 100;
 
 // Katrs AJAX pieprasījums nonāk šeit (sadaļa "Pieprasījumi").
-// `unseen` skaita jaunos pieprasījumus, kamēr žurnāls nav atvērts.
+// `unseen` ir jauno pieprasījumu skaits, kamēr žurnāls nav atvērts.
 export function useRequestLog(view) {
     const [entries, setEntries] = useState([]);
-    const [unseen, setUnseen] = useState(0);
-    const viewRef = useRef(view);
+    const [seenId, setSeenId] = useState(-1); // jaunākā ieraksta numurs, ko lietotājs jau redzējis
     const nextId = useRef(0);
 
-    useEffect(() => {
-        viewRef.current = view;
-        if (view === 'log') setUnseen(0);
-    }, [view]);
+    useEffect(() => Api.subscribeLog((entry) => {
+        const item = { ...entry, id: nextId.current++, time: new Date().toLocaleTimeString('lv-LV') };
+        setEntries((list) => [item, ...list].slice(0, MAX_LOG_ITEMS));
+    }), []);
 
-    useEffect(() => {
-        Api.onLog = (entry) => {
-            const item = { ...entry, id: nextId.current++, time: new Date().toLocaleTimeString('lv-LV') };
-            setEntries((list) => [item, ...list].slice(0, MAX_LOG_ITEMS));
-            if (viewRef.current !== 'log') setUnseen((n) => n + 1);
-        };
-        return () => { Api.onLog = () => {}; };
-    }, []);
+    // Atverot žurnālu, viss tiek uzskatīts par redzētu. Stāvokli drīkst pielāgot renderēšanas laikā,
+    // ja tas ir ierobežots ar nosacījumu (tā nav bezgalīga cilpa) un nav jāizmanto efekts.
+    const newestId = entries.length > 0 ? entries[0].id : seenId;
+    if (view === 'log' && seenId !== newestId) setSeenId(newestId);
 
+    const unseen = view === 'log' ? 0 : entries.filter((entry) => entry.id > seenId).length;
     const clear = useCallback(() => setEntries([]), []);
 
     return { entries, unseen, clear };

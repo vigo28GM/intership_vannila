@@ -9,14 +9,24 @@ export function usePosts(run) {
     const [filterId, setFilterId] = useState(null);   // ja nav null, rāda tikai šo ierakstu
     const [highlightId, setHighlightId] = useState(null);
     const sequence = useRef(0);
+    const abortRef = useRef(null);
 
-    // Ielādē visus ierakstus no servera. Ja pa to laiku sācies jauns pieprasījums,
-    // vecā atbilde tiek ignorēta.
+    // Atceļ ielādi, kas vēl notiek (piemēram, kad komponente pazūd vai sākas jauna ielāde)
+    const cancel = useCallback(() => {
+        abortRef.current?.abort();
+    }, []);
+
+    // Ielādē visus ierakstus no servera. Jauna ielāde atceļ iepriekšējo, un ja atbilde tomēr
+    // atnāk novēloti, tā tiek ignorēta.
     const load = useCallback(async () => {
         const mine = ++sequence.current;
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         setStatus('loading');
-        const loaded = await run(() => Api.getPosts());
-        if (mine !== sequence.current) return;
+        const loaded = await run(() => Api.getPosts({ signal: controller.signal }));
+        if (mine !== sequence.current || controller.signal.aborted) return;
         if (!loaded) {
             setStatus('error');
             return;
@@ -61,6 +71,6 @@ export function usePosts(run) {
 
     return {
         visible, total: posts.length, status, filterId, highlightId,
-        load, showOne, add, replace: upsert, remove,
+        load, cancel, showOne, add, replace: upsert, remove,
     };
 }

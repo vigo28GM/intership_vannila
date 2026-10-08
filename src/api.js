@@ -25,10 +25,41 @@ export class ApiError extends Error {
     }
 }
 
-let onLog = () => {};
+// Abonenti: vairāki komponenti var klausīties vienu un to pašu notikumu, un katrs var atrakstīties.
+const logListeners = new Set();
+const loadingListeners = new Set();
+const settingsListeners = new Set();
 
+function subscribe(listeners, listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
+
+const emit = (listeners, ...args) => listeners.forEach((listener) => listener(...args));
+
+// Atcelta pieprasījuma kļūda ir paredzēta darbība (piemēram, atvērta cita lapa), nevis atteice
+const abortError = () => new DOMException('Pieprasījums atcelts', 'AbortError');
+
+function isHttpUrl(value) {
+    try {
+        const { protocol } = new URL(value);
+        return protocol === 'http:' || protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+// Saglabātā adrese var būt bojāta (piemēram, ierakstīta ar roku), tāpēc to pārbauda
 function getBaseUrl() {
-    return store.get('apiUrl') || DEFAULT_URL;
+    const saved = store.get('apiUrl');
+    return typeof saved === 'string' && isHttpUrl(saved) ? saved : DEFAULT_URL;
+}
+
+// Saglabātais lietotājs arī var būt bojāts; nederīgu ignorē
+function getStoredUser() {
+    const saved = store.get('user');
+    const valid = saved && typeof saved === 'object' && Number.isInteger(saved.id) && typeof saved.name === 'string';
+    return valid ? saved : null;
 }
 
 function setBaseUrl(url) {
@@ -114,16 +145,20 @@ function errorMessage(data, status) {
 
 // ---------- 1. metode: fetch API ar async/await ----------
 
-async function sendWithFetch({ method, url, headers, body }) {
-    const response = await fetch(url, { method, headers, body });
+async function sendWithFetch({ method, url, headers, body, signal }) {
+    const response = await fetch(url, { method, headers, body, signal });
     const text = await response.text();
     return { status: response.status, text };
 }
 
 // ---------- 2. metode: XMLHttpRequest (ar notikumiem, ietīts Promise) ----------
 
-function sendWithXhr({ method, url, headers, body }) {
+function sendWithXhr({ method, url, headers, body, signal }) {
     return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(abortError());
+            return;
+        }
         const xhr = new XMLHttpRequest();
         xhr.open(method, url);
         for (const [name, value] of Object.entries(headers)) {
@@ -133,6 +168,11 @@ function sendWithXhr({ method, url, headers, body }) {
         xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
         xhr.onerror = () => reject(new Error('Tīkla kļūda'));
         xhr.ontimeout = () => reject(new Error('Serveris neatbild'));
+        // fetch atceļ ar signal pats; XMLHttpRequest jāatceļ ar roku
+        signal?.addEventListener('abort', () => {
+            xhr.abort();
+            reject(abortError());
+        }, { once: true });
         xhr.send(body);
     });
 }
@@ -152,7 +192,10 @@ function getMethod() {
 }
 
 function setMethod(name) {
-    if (name in TRANSPORTS) store.set('ajaxMethod', name);
+    if (name in TRANSPORTS) {
+        store.set('ajaxMethod', name);
+        emit(settingsListeners);
+    }
 }
 
 function isSlow() {
@@ -161,16 +204,16 @@ function isSlow() {
 
 function setSlow(value) {
     store.set('slowMode', Boolean(value));
+    emit(settingsListeners);
 }
 
 // ---------- Ielādes indikators: skaita, cik pieprasījumu vēl gaida atbildi ----------
 
 let pending = 0;
-let onLoading = () => {};
 
 function trackLoading(change) {
     pending += change;
-    onLoading(pending);
+    emit(loadingListeners, pending);
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -180,16 +223,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Kopīgais kodols jebkuram pieprasījumam (arī uz citām vietnēm): nosūta ar izvēlēto metodi
 // (fetch / XHR), skaita gaidošos pieprasījumus un raksta žurnālu. Tokenu šeit nepievieno —
 // galvenes sagatavo tas, kas funkciju izsauc.
-async function execute({ method, url, headers, body }) {
+async function execute({ method, url, headers, body, signal }) {
     const transport = TRANSPORTS[getMethod()];
     let status = 0;
     let data = null;
     let networkError = false;
+    let aborted = false;
     let started = performance.now();
 
     trackLoading(1);
     try {
         if (isSlow()) await sleep(SLOW_DELAY_MS);
+        if (signal?.aborted) throw abortError();
         started = performance.now();
 
         const response = await transport.send({
@@ -197,27 +242,47 @@ async function execute({ method, url, headers, body }) {
             url,
             headers,
             body: body !== undefined ? JSON.stringify(body) : undefined,
+            signal,
         });
         status = response.status;
         if (response.text) {
             try { data = JSON.parse(response.text); } catch { data = response.text; }
         }
-    } catch {
-        networkError = true; // serveris nav sasniedzams (abām metodēm vienāda apstrāde)
+    } catch (error) {
+        if (error?.name === 'AbortError') aborted = true; // atcelts: nav kļūda un netiek rakstīts žurnālā
+        else networkError = true; // serveris nav sasniedzams (abām metodēm vienāda apstrāde)
     } finally {
         trackLoading(-1);
-        onLog({
-            method, url, status, body, data,
-            via: transport.label,
-            ms: Math.round(performance.now() - started),
-        });
+        if (!aborted) {
+            emit(logListeners, {
+                method, url, status, body, data,
+                ...describeTarget(url),
+                via: transport.label,
+                ms: Math.round(performance.now() - started),
+            });
+        }
     }
 
-    return { status, data, networkError };
+    return { status, data, networkError, aborted };
+}
+
+// Žurnālam: kurš serveris un ceļš, un vai tas ir cits serviss (nevis mūsu API).
+// To aprēķina šeit, nevis komponentē renderēšanas laikā, lai komponente paliek tīra.
+function describeTarget(url) {
+    try {
+        const target = new URL(url);
+        return {
+            host: target.host,
+            path: target.pathname + target.search,
+            external: target.host !== new URL(getBaseUrl()).host,
+        };
+    } catch {
+        return { host: '', path: url, external: false };
+    }
 }
 
 // Pieprasījums uz mūsu Laravel API (ar tokenu un latviešu kļūdu tekstiem)
-async function request(method, path, body) {
+async function request(method, path, body, { signal } = {}) {
     const url = getBaseUrl() + path;
     // Accept: application/json liek Laravel atgriezt kļūdas JSON formātā, nevis HTML
     const headers = { Accept: 'application/json' };
@@ -225,8 +290,9 @@ async function request(method, path, body) {
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const { status, data, networkError } = await execute({ method, url, headers, body });
+    const { status, data, networkError, aborted } = await execute({ method, url, headers, body, signal });
 
+    if (aborted) throw abortError();
     if (networkError) throw new ApiError(statusMessage(0), 0, null);
 
     // /login atgriež kļūdu ar statusu 200, tāpēc pārbaudām arī "errors" lauku
@@ -289,21 +355,25 @@ export const Api = {
     setBaseUrl,
     getToken,
     setToken,
-    set onLog(fn) { onLog = fn; },
-    set onLoading(fn) { onLoading = fn; },
+    getStoredUser,
     getMethod,
     setMethod,
     isSlow,
     setSlow,
 
+    // Abonēšana (katra funkcija atgriež atrakstīšanās funkciju): žurnāls, ielāde, iestatījumi
+    subscribeLog: (listener) => subscribe(logListeners, listener),
+    subscribeLoading: (listener) => subscribe(loadingListeners, listener),
+    subscribeSettings: (listener) => subscribe(settingsListeners, listener),
+
     // Autentifikācija
     register: (fields) => request('POST', '/register', fields),
     login: (fields) => request('POST', '/login', fields),
     logout: () => request('POST', '/logout'),
-    me: () => request('GET', '/user'),
+    me: (options) => request('GET', '/user', undefined, options),
 
     // Ieraksti
-    getPosts: () => request('GET', '/posts'),
+    getPosts: (options) => request('GET', '/posts', undefined, options),
     getPost: (id) => request('GET', `/posts/${id}`),
     createPost: (fields) => request('POST', '/posts', fields),
     updatePost: (id, fields) => request('PUT', `/posts/${id}`, fields),

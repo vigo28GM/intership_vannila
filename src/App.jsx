@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Api } from './api.js';
 import { AppContext } from './AppContext.js';
 import NavBar from './components/NavBar.jsx';
@@ -23,14 +23,17 @@ export default function App() {
     const loading = useLoadingBar();
     const log = useRequestLog(view);
 
-    const [user, setUser] = useState(() => Api.store.get('user'));
-    const [menuOpen, setMenuOpen] = useState(false);
-    const [method, setMethod] = useState(Api.getMethod);
-    const [slow, setSlow] = useState(Api.isSlow);
+    const [user, setUser] = useState(Api.getStoredUser);
 
-    // `run` ir stabila funkcija, tāpēc tai vajag jaunāko lietotāju caur ref
-    const currentUser = useRef(user);
-    currentUser.current = user;
+    // Mobilā izvēlne ir atvērta tikai tai sadaļai, kurā to atvēra, tāpēc, pārejot citur, tā aizveras
+    // pati (nevajag efektu, kas izsauc setState).
+    const [menu, setMenu] = useState({ open: false, view });
+    const menuOpen = menu.open && menu.view === view;
+
+    // AJAX iestatījumus glabā api.js (un localStorage). React tos lasa kā ārēju avotu,
+    // tāpēc nav divu atsevišķu "patiesības avotu".
+    const method = useSyncExternalStore(Api.subscribeSettings, Api.getMethod);
+    const slow = useSyncExternalStore(Api.subscribeSettings, Api.isSlow);
 
     // ---------- Sesija ----------
 
@@ -42,14 +45,15 @@ export default function App() {
     }, []);
 
     // Izpilda API izsaukumu un parāda paziņojumu par rezultātu.
-    // Kļūdas gadījumā atgriež undefined, veiksmē — rezultātu (vai true, ja tā nav).
+    // Kļūdas gadījumā atgriež undefined, veiksmē: rezultātu (vai true, ja tā nav).
     const run = useCallback(async (task, successMessage) => {
         try {
             const result = await task();
             if (successMessage) notify(successMessage, 'ok');
             return result ?? true;
         } catch (error) {
-            if (error.status === 401 && currentUser.current) {
+            if (error.name === 'AbortError') return undefined; // atcelts pieprasījums nav kļūda
+            if (error.status === 401 && Api.getToken()) {
                 setSession(null, null);
                 notify('Sesija beigusies, pieslēdzies no jauna.', 'error');
             } else {
@@ -64,30 +68,29 @@ export default function App() {
     // Saraksts atkarīgs no lietotāja: privātos ierakstus redz tikai to autors,
     // un pogas "Rediģēt"/"Dzēst" parādās tikai pašu ierakstiem. Tāpēc to ielādē
     // lapas atvēršanā un pēc katras pieslēgšanās vai izrakstīšanās.
-    const { load } = posts;
+    // Sakopšana atceļ pieprasījumu, ja efekts tiek atsākts vai komponente pazūd.
+    const { load, cancel } = posts;
     const userId = user?.id ?? null;
     useEffect(() => {
         load();
-    }, [load, userId]);
+        return cancel;
+    }, [load, cancel, userId]);
 
-    // Pārejot uz citu sadaļu, lapa ritinās uz augšu un mobilā izvēlne aizveras
+    // Pārejot uz citu sadaļu, lapa ritinās uz augšu (darbība ar pārlūku ārpus React)
     useEffect(() => {
         window.scrollTo(0, 0);
-        setMenuOpen(false);
     }, [view]);
 
     // ---------- AJAX iestatījumi ----------
 
     const changeMethod = (name) => {
         Api.setMethod(name);
-        setMethod(name);
         notify(`Pieprasījumi tagad tiek sūtīti ar: ${METHOD_NAMES[name]}`);
         load(); // tas pats uzdevums, cita metode
     };
 
     const changeSlow = (value) => {
         Api.setSlow(value);
-        setSlow(value);
         notify(value ? 'Lēnā savienojuma simulācija ieslēgta.' : 'Lēnā savienojuma simulācija izslēgta.');
     };
 
@@ -102,7 +105,7 @@ export default function App() {
                     unseen={log.unseen}
                     loading={loading}
                     menuOpen={menuOpen}
-                    onToggleMenu={() => setMenuOpen((open) => !open)}
+                    onToggleMenu={() => setMenu({ open: !menuOpen, view })}
                 />
 
                 <main className="container">

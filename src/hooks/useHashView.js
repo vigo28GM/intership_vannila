@@ -1,25 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 export const VIEWS = ['posts', 'new', 'roles', 'jokes', 'account', 'log'];
 
-function readView() {
-    const name = window.location.hash.slice(1);
-    return VIEWS.includes(name) ? name : 'posts';
+// Adreses daļa pēc # ir "ārējs avots": pārlūka stāvoklis, ko React nepārvalda.
+// useSyncExternalStore ir React veids, kā to droši lasīt un sekot izmaiņām.
+function subscribe(onChange) {
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
 }
 
+const getSnapshot = () => window.location.hash;
+
 // Navigācija bez lapas pārlādes: aktīvo sadaļu nosaka adreses daļa pēc #
-// (kā iepriekš), un `hashchange` notikums paziņo, kad tā mainās.
 export function useHashView() {
-    const [view, setView] = useState(readView);
+    const name = useSyncExternalStore(subscribe, getSnapshot).slice(1);
+    const view = VIEWS.includes(name) ? name : 'posts';
 
-    useEffect(() => {
-        const onChange = () => setView(readView());
-        window.addEventListener('hashchange', onChange);
-        return () => window.removeEventListener('hashchange', onChange);
-    }, []);
-
-    const go = useCallback((name) => {
-        window.location.hash = name;
+    const go = useCallback((target) => {
+        window.location.hash = target;
     }, []);
 
     return { view, go };

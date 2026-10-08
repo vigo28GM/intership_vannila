@@ -984,6 +984,27 @@ button.primary.loading::after { border-color: rgb(255 255 255 / 0.4); border-top
     font-size: 0.8rem;
 }
 
+/* ================= Kļūdas ekrāns (ErrorBoundary) ================= */
+
+.error-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 640px;
+    margin: 48px auto;
+}
+
+.error-details {
+    margin: 0;
+    padding: 10px 12px;
+    max-height: 200px;
+    overflow: auto;
+    background: var(--surface-2);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+}
+
 /* ================= Paziņojums ================= */
 
 .toast {

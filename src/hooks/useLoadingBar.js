@@ -12,7 +12,7 @@ export function useLoadingBar() {
         let shownAt = 0;
         let timer;
 
-        Api.onLoading = (pending) => {
+        const unsubscribe = Api.subscribeLoading((pending) => {
             clearTimeout(timer);
             if (pending > 0) {
                 if (!visible) {
@@ -27,11 +27,12 @@ export function useLoadingBar() {
                 visible = false;
                 setLoading(false);
             }, wait);
-        };
+        });
 
+        // Sakopšana: atrakstās no notikumiem un atceļ taimeri
         return () => {
             clearTimeout(timer);
-            Api.onLoading = () => {};
+            unsubscribe();
         };
     }, []);
 

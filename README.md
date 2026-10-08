@@ -49,6 +49,30 @@ src/
 └── views/              sešas lapas: PostsView, NewPostView, RolesView, JokesView, AccountView, LogView
 ```
 
+## Kvalitāte: React noteikumi un kļūdu apstrāde
+
+- **`npm run lint`** pārbauda kodu ar ESLint un oficiālo `eslint-plugin-react-hooks` (17 noteikumi): Rules of Hooks, „komponentēm jābūt tīrām” (nedrīkst rakstīt `ref` renderēšanā, mainīt stāvokli efektā bez vajadzības, lasīt ārējus datus renderēšanā utt.). Kodā nav `eslint-disable` komentāru.
+- **`<StrictMode>`** (`src/main.jsx`) izstrādes laikā komponentes un efektus izpilda papildu reizi, lai atklātu netīras komponentes un trūkstošu sakopšanu. Tāpēc izstrādes režīmā `npm run dev` pirmā ielāde nosūta pieprasījumu divreiz: pirmais tiek **atcelts** (`AbortController`) un žurnālā neparādās. Gatavajā versijā (`npm run build`) pieprasījums ir viens.
+- **`ErrorBoundary`** (`src/components/ErrorBoundary.jsx`) notver kļūdas renderēšanas laikā un parāda ziņojumu ar pogām „Mēģināt vēlreiz” un „Notīrīt saglabātos iestatījumus un pārlādēt”, nevis tukšu lapu. Kļūdu robežas nenotver kļūdas notikumu apstrādātājos un async kodā, tās apstrādā `run()` (`App.jsx`).
+- **Saglabātie dati tiek pārbaudīti** (`api.js`): bojāta API adrese vai lietotājs `localStorage` tiek ignorēti, un lietotne sāk ar noklusējuma vērtībām.
+- **Ārējie avoti React veidā:** adreses `#hash` un AJAX iestatījumi tiek lasīti ar `useSyncExternalStore`, bet žurnāls un ielādes josla abonē `api.js` notikumus un atrakstās sakopšanā.
+
+### Atbilstība oficiālajiem [Rules of React](https://react.dev/reference/rules)
+
+| Noteikums | Kā kods to ievēro |
+|---|---|
+| **Komponentēm jābūt idempotentām** (vienādi ievaddati → vienāds rezultāts) | renderēšanā nav `Date.now()`, `Math.random()` vai `new Date()`; laiks tiek ņemts notikumu apstrādātājos (`useRequestLog`, `useLoadingBar`) |
+| **Blakusefekti ārpus renderēšanas** | `window`, `localStorage`, taimeri un `focus()` ir tikai efektos un notikumu apstrādātājos; `LogEntry` serveri un ceļu saņem jau aprēķinātu |
+| **Props un state ir nemaināmi** | stāvoklis tiek mainīts tikai ar `set…` funkcijām un jauniem masīviem (`[...list, post]`, `[...posts].reverse()`); `items.push` aprakstā `describeFilters` ir lokāls masīvs, ko atļauj noteikums par lokālu maiņu |
+| **Hook argumenti un atgrieztās vērtības ir nemaināmas** | `usePosts`, `useRunner` u.c. neko nemaina, kas nāk no ārpuses |
+| **Vērtības pēc nodošanas JSX netiek mainītas** | visi dati sagatavoti pirms JSX |
+| **Komponentes netiek izsauktas kā funkcijas** | tikai JSX (`<ProfileCard />`), meklēšana neatrada nevienu `Komponente()` izsaukumu |
+| **Hook netiek nodoti kā vērtības** | nav `useX` nodošanas kā props vai argumenta |
+| **Hook tikai augšējā līmenī** | `rules-of-hooks` (ESLint) bez kļūdām; nav hook nosacījumos, ciklos vai pēc `return` |
+| **Hook tikai React funkcijās** | hook izsauc tikai komponentes un `use…` funkcijas; `api.js` un `format.js` hook neizmanto |
+
+Papildus noteikumiem tiek lietoti dokumentēti paņēmieni: `useSyncExternalStore` (stabila `subscribe`, `getSnapshot` atgriež nemaināmas vērtības), `useEffectEvent` (izsaukts tikai efektā, nav atkarību masīvā) un stāvokļa pielāgošana renderēšanā tikai ar nosacījumu un tikai savam stāvoklim (`useRequestLog`).
+
 ## Kā tas atbilst iepriekšējai versijai bez React
 
 | Iepriekš | Tagad |

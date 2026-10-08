@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Api } from '../api.js';
 import Button from '../components/Button.jsx';
 import JokeCard from '../components/JokeCard.jsx';
@@ -106,13 +106,15 @@ export default function JokesView({ active }) {
         }
     };
 
-    // Pirmoreiz atverot sadaļu, uzreiz parāda dažus jokus
+    // Pirmoreiz atverot sadaļu, uzreiz parāda dažus jokus. useEffectEvent ļauj efektā izsaukt
+    // `search` ar pašreizējiem filtriem, nepadarot efektu atkarīgu no katras filtra maiņas.
+    const searchOnFirstOpen = useEffectEvent(() => search());
     useEffect(() => {
         if (active && !loadedOnce.current) {
             loadedOnce.current = true;
-            search();
+            searchOnFirstOpen();
         }
-    }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [active]);
 
     const submit = (event) => {
         event.preventDefault();

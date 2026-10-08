@@ -1,7 +1,16 @@
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './styles.css';
 
-// Bez <StrictMode>: izstrādes režīmā tas katru efektu izpilda divreiz, un pieprasījumu
-// žurnālā katrs pieprasījums parādītos dubultā.
-createRoot(document.getElementById('root')).render(<App />);
+// StrictMode izstrādes laikā komponentes un efektus izpilda papildu reizi, lai atklātu kļūdas
+// (netīras komponentes, trūkstošu sakopšanu). Gatavajā versijā tas neko nemaina.
+// ErrorBoundary notver kļūdas renderēšanas laikā, lai nepaliktu tukša lapa.
+createRoot(document.getElementById('root')).render(
+    <StrictMode>
+        <ErrorBoundary>
+            <App />
+        </ErrorBoundary>
+    </StrictMode>,
+);
